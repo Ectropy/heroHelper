@@ -72,19 +72,33 @@ function Step1({ state, setState }) {
   const { mode, previewUrl, dnnPath, urlInput } = state
   const fileRef = useRef(null)
 
+  // Split dnnPath into folder and filename for display
+  const lastSlash = dnnPath.lastIndexOf('/')
+  const dnnFolder = lastSlash >= 0 ? dnnPath.slice(0, lastSlash + 1) : ''
+  const dnnFilename = lastSlash >= 0 ? dnnPath.slice(lastSlash + 1) : dnnPath
+
   const handleFileChange = (e) => {
     const file = e.target.files[0]
     if (!file) return
     const objectUrl = URL.createObjectURL(file)
-    setState(s => ({ ...s, previewUrl: objectUrl, dnnPath: s.dnnPath }))
+    setState(s => {
+      const ls = s.dnnPath.lastIndexOf('/')
+      const folder = ls >= 0 ? s.dnnPath.slice(0, ls + 1) : ''
+      const newPath = folder + file.name
+      localStorage.setItem(STORAGE_KEY, newPath)
+      return { ...s, previewUrl: objectUrl, dnnPath: newPath }
+    })
   }
 
   const handleUrlInput = (val) => {
     setState(s => ({ ...s, urlInput: val, previewUrl: val }))
   }
 
-  const handleDnnPath = (val) => {
-    setState(s => ({ ...s, dnnPath: val }))
+  const handleDnnFolder = (val) => {
+    // Ensure folder always ends with / when non-empty
+    const newPath = val + dnnFilename
+    localStorage.setItem(STORAGE_KEY, newPath)
+    setState(s => ({ ...s, dnnPath: newPath }))
   }
 
   const handleModeChange = (newMode) => {
@@ -143,17 +157,30 @@ function Step1({ state, setState }) {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               DNN server path for this image
             </label>
-            <input
-              type="text"
-              value={dnnPath}
-              onChange={e => handleDnnPath(e.target.value)}
-              placeholder="/Portals/0/Images/your-image.jpg"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <p className="mt-1 text-xs text-gray-400">
-              This is the path where you uploaded (or will upload) the image in DNN's file manager.
-              Example: <span className="font-mono">/Portals/0/Images/campus-aerial.jpg</span>
-            </p>
+            {/* Joined folder + filename inputs */}
+            <div className="flex items-stretch rounded-lg border border-gray-300 overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500">
+              <input
+                type="text"
+                value={dnnFolder}
+                onChange={e => handleDnnFolder(e.target.value)}
+                placeholder="/Portals/0/Images/"
+                className="flex-1 min-w-0 px-3 py-2 text-sm focus:outline-none"
+              />
+              <div className="flex items-center px-3 py-2 bg-gray-50 border-l border-gray-300 text-sm text-gray-500 font-mono whitespace-nowrap max-w-[40%] overflow-hidden text-ellipsis">
+                {dnnFilename || <span className="text-gray-300 italic font-sans">filename</span>}
+              </div>
+            </div>
+            {/* Full path preview */}
+            {dnnPath && (
+              <p className="mt-1.5 text-xs text-gray-400 font-mono truncate">
+                → {dnnPath}
+              </p>
+            )}
+            {!dnnPath && (
+              <p className="mt-1 text-xs text-gray-400">
+                Enter the folder path where you uploaded (or will upload) this image in DNN's file manager.
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -380,7 +407,7 @@ function Step4({ state, setState }) {
       step: 1,
       mode: 'pc',
       previewUrl: '',
-      dnnPath: '',
+      dnnPath: localStorage.getItem(STORAGE_KEY) || '',
       urlInput: '',
       src: '',
       alt: '',
@@ -456,12 +483,14 @@ function Step4({ state, setState }) {
 }
 
 // ── App root ─────────────────────────────────────────────────────────────────
+const STORAGE_KEY = 'hh-dnn-path'
+
 export default function App() {
   const [state, setState] = useState({
     step: 1,
     mode: 'pc',
     previewUrl: '',
-    dnnPath: '',
+    dnnPath: localStorage.getItem(STORAGE_KEY) || '',
     urlInput: '',
     src: '',
     alt: '',
