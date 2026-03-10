@@ -26,6 +26,20 @@ const HERO_STYLES = `<style>
   }
 </style>`
 
+const HERO_HEIGHT = 400 // px — must match the CSS above
+
+const PRESETS = [
+  { key: '2160p', label: '2160p (4K UHD)', width: 3840 },
+  { key: '1440p', label: '1440p (2K QHD)', width: 2560 },
+  { key: '1080p', label: '1080p (Full HD)', width: 1920 },
+  { key: '720p',  label: '720p (HD)',       width: 1280 },
+  { key: 'mobile', label: 'Mobile', width: null },
+]
+
+function clamp(val, min, max) {
+  return Math.min(Math.max(val, min), max)
+}
+
 function generateHtml({ src, alt, focalX, focalY }) {
   const x = Math.round(focalX)
   const y = Math.round(focalY)
@@ -58,6 +72,8 @@ function SectionLabel({ number, title, done }) {
 
 export default function App() {
   const fileRef = useRef(null)
+  const pickerRef = useRef(null)
+
   const [state, setState] = useState({
     mode: 'pc',
     previewUrl: '',
@@ -67,12 +83,14 @@ export default function App() {
     alt: '',
     focalX: 50,
     focalY: 50,
+    simPreset: '1080p',
+    imgNatural: { w: 0, h: 0 },
   })
   const [altWarned, setAltWarned] = useState(false)
   const [copied, setCopied] = useState(false)
 
   // ── Derived values ──────────────────────────────────────────────────────────
-  const { mode, previewUrl, dnnPath, urlInput, alt, focalX, focalY } = state
+  const { mode, previewUrl, dnnPath, urlInput, alt, focalX, focalY, simPreset, imgNatural } = state
 
   const lastSlash = dnnPath.lastIndexOf('/')
   const dnnFolder = lastSlash >= 0 ? dnnPath.slice(0, lastSlash + 1) : ''
@@ -85,6 +103,46 @@ export default function App() {
 
   const html = isComplete ? generateHtml({ src: srcForOutput, alt, focalX, focalY }) : ''
 
+  const currentPreset = PRESETS.find(p => p.key === simPreset) || PRESETS[2]
+  const isMobile = simPreset === 'mobile'
+  const showSizeWarning = !isMobile && imgNatural.w > 0 && currentPreset.width > imgNatural.w
+
+  // ── Crop overlay math ────────────────────────────────────────────────────────
+  // Returns % coords (relative to picker display area) for the dashed crop rectangle.
+  function getCropOverlay() {
+    if (isMobile || !imgNatural.w || !imgNatural.h || !pickerRef.current) return null
+    const simWidth = currentPreset.width
+    const pickerW = pickerRef.current.offsetWidth
+    const pickerH = pickerRef.current.offsetHeight
+    if (!pickerW || !pickerH) return null
+
+    // Hero crop region in image-space (0..1)
+    const heroScale = Math.max(simWidth / imgNatural.w, HERO_HEIGHT / imgNatural.h)
+    const heroVisW = simWidth / (heroScale * imgNatural.w)
+    const heroVisH = HERO_HEIGHT / (heroScale * imgNatural.h)
+    const cx = clamp(focalX / 100, heroVisW / 2, 1 - heroVisW / 2)
+    const cy = clamp(focalY / 100, heroVisH / 2, 1 - heroVisH / 2)
+    const heroLeft = cx - heroVisW / 2
+    const heroTop  = cy - heroVisH / 2
+
+    // Picker's own visible region in image-space (object-cover, centered at 50/50)
+    const pickerScale = Math.max(pickerW / imgNatural.w, pickerH / imgNatural.h)
+    const pickerVisW  = pickerW / (pickerScale * imgNatural.w)
+    const pickerVisH  = pickerH / (pickerScale * imgNatural.h)
+    const pickerLeft  = 0.5 - pickerVisW / 2
+    const pickerTop   = 0.5 - pickerVisH / 2
+
+    // Map hero rect to picker display space (%)
+    return {
+      left:   (heroLeft - pickerLeft) / pickerVisW * 100,
+      top:    (heroTop  - pickerTop)  / pickerVisH * 100,
+      width:  heroVisW / pickerVisW * 100,
+      height: heroVisH / pickerVisH * 100,
+    }
+  }
+
+  const cropOverlay = previewUrl ? getCropOverlay() : null
+
   // ── Handlers ────────────────────────────────────────────────────────────────
   const handleFileChange = (e) => {
     const file = e.target.files[0]
@@ -95,7 +153,7 @@ export default function App() {
       const folder = ls >= 0 ? s.dnnPath.slice(0, ls + 1) : ''
       const newPath = folder + file.name
       localStorage.setItem(STORAGE_KEY, newPath)
-      return { ...s, previewUrl: objectUrl, dnnPath: newPath }
+      return { ...s, previewUrl: objectUrl, dnnPath: newPath, imgNatural: { w: 0, h: 0 } }
     })
   }
 
@@ -106,12 +164,12 @@ export default function App() {
   }
 
   const handleModeChange = (newMode) => {
-    setState(s => ({ ...s, mode: newMode, previewUrl: '', urlInput: '', dnnPath: '' }))
+    setState(s => ({ ...s, mode: newMode, previewUrl: '', urlInput: '', dnnPath: '', imgNatural: { w: 0, h: 0 } }))
     if (fileRef.current) fileRef.current.value = ''
   }
 
   const handleUrlInput = (val) => {
-    setState(s => ({ ...s, urlInput: val, previewUrl: val }))
+    setState(s => ({ ...s, urlInput: val, previewUrl: val, imgNatural: { w: 0, h: 0 } }))
   }
 
   const handleFocalClick = useCallback((e) => {
@@ -119,6 +177,11 @@ export default function App() {
     const x = ((e.clientX - rect.left) / rect.width) * 100
     const y = ((e.clientY - rect.top) / rect.height) * 100
     setState(s => ({ ...s, focalX: Math.round(x), focalY: Math.round(y) }))
+  }, [])
+
+  const handleNaturalLoad = useCallback((e) => {
+    const { naturalWidth: w, naturalHeight: h } = e.target
+    if (w && h) setState(s => ({ ...s, imgNatural: { w, h } }))
   }, [])
 
   const handleCopy = () => {
@@ -138,6 +201,8 @@ export default function App() {
       alt: '',
       focalX: 50,
       focalY: 50,
+      simPreset: '1080p',
+      imgNatural: { w: 0, h: 0 },
     })
     setAltWarned(false)
     if (fileRef.current) fileRef.current.value = ''
@@ -278,6 +343,7 @@ export default function App() {
                     Click the most important part of the image — it stays visible when cropped on small screens.
                   </p>
                   <div
+                    ref={pickerRef}
                     className="relative rounded-lg overflow-hidden border-2 border-dashed border-blue-300 bg-gray-50 cursor-crosshair select-none"
                     onClick={handleFocalClick}
                   >
@@ -287,8 +353,10 @@ export default function App() {
                       className="w-full object-cover block pointer-events-none"
                       style={{ maxHeight: '300px' }}
                       draggable={false}
+                      onLoad={handleNaturalLoad}
                       onError={() => setState(s => ({ ...s, previewUrl: '' }))}
                     />
+                    {/* Focal point marker */}
                     <div
                       className="absolute pointer-events-none"
                       style={{ left: `${focalX}%`, top: `${focalY}%`, transform: 'translate(-50%, -50%)' }}
@@ -297,11 +365,23 @@ export default function App() {
                         <div className="w-2 h-2 rounded-full bg-white" />
                       </div>
                     </div>
+                    {/* Crop overlay */}
+                    {cropOverlay && (
+                      <div
+                        className="absolute pointer-events-none border-2 border-dashed border-yellow-400"
+                        style={{
+                          left:   `${cropOverlay.left}%`,
+                          top:    `${cropOverlay.top}%`,
+                          width:  `${cropOverlay.width}%`,
+                          height: `${cropOverlay.height}%`,
+                        }}
+                      />
+                    )}
                   </div>
                   <p className="mt-1 text-xs text-gray-400">
-                    Focal point: <span className="font-mono text-gray-500">{focalX}% from left, {focalY}% from top</span>. Click to reposition.
+                    Focal point: <span className="font-mono text-gray-500">{focalX}% from left, {focalY}% from top</span>.
+                    {cropOverlay && <> Yellow box = crop at <span className="font-medium text-gray-500">{currentPreset.label}</span>.</>}
                   </p>
-
                 </>
               ) : (
                 <div className="rounded-lg border-2 border-dashed border-gray-200 bg-gray-50 flex items-center justify-center h-32">
@@ -318,17 +398,58 @@ export default function App() {
             {/* Crop preview */}
             {previewUrl ? (
               <div className="rounded-xl overflow-hidden border border-gray-200 bg-white shadow-sm">
-                <div className="bg-gray-100 px-3 py-1.5 text-xs text-gray-500 font-medium border-b border-gray-200">
-                  Preview (desktop crop)
+                {/* Toolbar */}
+                <div className="bg-gray-100 px-3 py-1.5 border-b border-gray-200 flex items-center gap-3 flex-wrap">
+                  <span className="text-xs text-gray-500 font-medium shrink-0">
+                    Preview
+                  </span>
+                  <div className="flex gap-1 flex-wrap">
+                    {PRESETS.map(p => (
+                      <button
+                        key={p.key}
+                        onClick={() => setState(s => ({ ...s, simPreset: p.key }))}
+                        className={`px-2 py-0.5 rounded text-xs font-medium transition-colors
+                          ${simPreset === p.key
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-white text-gray-500 hover:bg-gray-200 border border-gray-300'}`}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div className="w-full overflow-hidden" style={{ height: '200px' }}>
-                  <img
-                    src={previewUrl}
-                    alt="Crop preview"
-                    className="w-full h-full object-cover block"
-                    style={{ objectPosition: `${focalX}% ${focalY}%` }}
-                  />
-                </div>
+
+                {isMobile ? (
+                  <div className="w-full bg-gray-50">
+                    <img
+                      src={previewUrl}
+                      alt="Mobile preview"
+                      className="w-full block"
+                      style={{ objectFit: 'contain', height: 'auto' }}
+                    />
+                    <p className="text-center text-xs text-gray-400 py-1.5">Mobile — image is not cropped</p>
+                  </div>
+                ) : (
+                  <div
+                    className="w-full overflow-hidden"
+                    style={{ aspectRatio: `${currentPreset.width} / ${HERO_HEIGHT}` }}
+                  >
+                    <img
+                      src={previewUrl}
+                      alt="Crop preview"
+                      className="w-full h-full object-cover block"
+                      style={{ objectPosition: `${focalX}% ${focalY}%` }}
+                      onLoad={handleNaturalLoad}
+                    />
+                  </div>
+                )}
+
+                {showSizeWarning && (
+                  <div className="px-3 py-1.5 bg-amber-50 border-t border-amber-200 text-xs text-amber-700 flex items-center gap-1.5">
+                    <span>⚠</span>
+                    <span>Image is only {imgNatural.w}px wide — may appear blurry at {currentPreset.label}.</span>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="rounded-xl border-2 border-dashed border-gray-200 bg-white flex items-center justify-center" style={{ height: '200px' }}>
