@@ -362,7 +362,7 @@ export default function App() {
               {previewUrl ? (
                 <>
                   <p className="text-xs text-gray-500 mb-2">
-                    Click the most important part of the image — it stays visible when cropped on small screens.
+                    Click the most important part of the image. It should remain visible on all screen sizes.
                   </p>
                   <div
                     ref={pickerRef}
