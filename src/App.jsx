@@ -211,17 +211,17 @@ export default function App() {
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 py-8 px-4">
-      <div className="w-full max-w-6xl mx-auto">
+      <div className="w-full">
 
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Hero Image Helper</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Hero Helper</h1>
           <p className="mt-0.5 text-sm text-gray-500">
-            Build a hero image banner for your DNN page — no coding required.
+            Quickly generate hero image HTML for any image.
           </p>
         </div>
 
-        {/* Two-column layout */}
+        {/* Three-column layout: inputs | preview | html (xl+); two-column: inputs | preview+html (lg); stacked (below lg) */}
         <div className="flex flex-col lg:flex-row gap-4 items-start">
 
           {/* ── LEFT: Inputs ── */}
@@ -392,8 +392,11 @@ export default function App() {
 
           </div>
 
-          {/* ── RIGHT: Crop preview + HTML output ── */}
-          <div className="flex-1 min-w-0 space-y-4">
+          {/* ── RIGHT: preview + HTML (stacked on lg, side-by-side on xl) ── */}
+          <div className="w-full flex-1 min-w-0 flex flex-col xl:flex-row gap-4 items-start">
+
+            {/* ── MIDDLE: Crop preview ── */}
+            <div className="w-full xl:flex-1 min-w-0">
 
             {/* Crop preview */}
             {previewUrl ? (
@@ -457,48 +460,52 @@ export default function App() {
               </div>
             )}
 
-            {/* Section 4: Output */}
-            <div className={`bg-white rounded-xl shadow-sm border p-4 transition-opacity
-              ${isComplete ? 'border-gray-100 opacity-100' : 'border-gray-100 opacity-50 pointer-events-none'}`}>
-              <SectionLabel number={4} title="Your HTML code" done={false} />
+            </div>{/* ── END MIDDLE ── */}
 
-              {isComplete ? (
-                <>
-                  <p className="text-xs text-gray-500 mb-3">
-                    Copy and paste into your DNN Text/HTML module.
-                  </p>
-                  <div className="bg-gray-900 rounded-lg overflow-hidden">
-                    <div className="flex items-center justify-between px-3 py-2 border-b border-gray-700">
-                      <span className="text-xs text-gray-400 font-medium">HTML</span>
+            {/* ── RIGHT: HTML output ── */}
+            <div className="w-full xl:w-96 shrink-0">
+              <div className={`bg-white rounded-xl shadow-sm border p-4 transition-opacity
+                ${isComplete ? 'border-gray-100 opacity-100' : 'border-gray-100 opacity-50 pointer-events-none'}`}>
+                <SectionLabel number={4} title="Your HTML code" done={false} />
+
+                {isComplete ? (
+                  <>
+                    <p className="text-xs text-gray-500 mb-3">
+                      Copy and paste into your DNN Text/HTML module.
+                    </p>
+                    <div className="bg-gray-900 rounded-lg overflow-hidden">
+                      <div className="flex items-center justify-between px-3 py-2 border-b border-gray-700">
+                        <span className="text-xs text-gray-400 font-medium">HTML</span>
+                        <button
+                          onClick={handleCopy}
+                          className={`text-xs font-medium px-3 py-1 rounded-md transition-colors
+                            ${copied ? 'bg-green-500 text-white' : 'bg-gray-700 text-gray-200 hover:bg-gray-600'}`}
+                        >
+                          {copied ? '✓ Copied!' : 'Copy to clipboard'}
+                        </button>
+                      </div>
+                      <pre className="p-3 text-xs text-green-300 overflow-x-auto overflow-y-auto whitespace-pre font-mono leading-relaxed">
+                        {html}
+                      </pre>
+                    </div>
+                    <div className="mt-3 flex justify-end">
                       <button
-                        onClick={handleCopy}
-                        className={`text-xs font-medium px-3 py-1 rounded-md transition-colors
-                          ${copied ? 'bg-green-500 text-white' : 'bg-gray-700 text-gray-200 hover:bg-gray-600'}`}
+                        onClick={handleReset}
+                        className="px-4 py-1.5 bg-gray-800 text-white rounded-lg font-medium text-xs hover:bg-gray-700 transition-colors"
                       >
-                        {copied ? '✓ Copied!' : 'Copy to clipboard'}
+                        Start over
                       </button>
                     </div>
-                    <pre className="p-3 text-xs text-green-300 overflow-x-auto whitespace-pre font-mono leading-relaxed">
-                      {html}
-                    </pre>
-                  </div>
-                  <div className="mt-3 flex justify-end">
-                    <button
-                      onClick={handleReset}
-                      className="px-4 py-1.5 bg-gray-800 text-white rounded-lg font-medium text-xs hover:bg-gray-700 transition-colors"
-                    >
-                      Start over
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <p className="text-xs text-gray-400">
-                  Fill in your image source and alt text to generate the code.
-                </p>
-              )}
-            </div>
+                  </>
+                ) : (
+                  <p className="text-xs text-gray-400">
+                    Fill in your image source and alt text to generate the code.
+                  </p>
+                )}
+              </div>
+            </div>{/* ── END RIGHT ── */}
 
-          </div>
+          </div>{/* ── END RIGHT WRAPPER ── */}
         </div>
 
         <p className="text-center text-xs text-gray-400 mt-6">Created by Ectropy</p>
