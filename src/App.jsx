@@ -1,11 +1,48 @@
 import { useState, useRef, useCallback } from 'react'
 
-// The CSS block that gets injected into the DNN HTML module alongside the markup.
-// Uses hh- prefix to minimize collision with unknown DNN themes.
-const HERO_STYLES = `<style>
+// Each preset: label, CSS clamp string for generated output, and calcH(vw) for crop math
+const HEIGHT_PRESETS = [
+  { key: 'short',      label: 'Short',       clamp: 'clamp(220px, 13vw, 440px)',  calcH: vw => Math.min(Math.max(220, vw * 0.13), 440) },
+  { key: 'standard',   label: 'Standard',    clamp: 'clamp(350px, 21vw, 700px)',  calcH: vw => Math.min(Math.max(350, vw * 0.21), 700) },
+  { key: 'tall',       label: 'Tall',        clamp: 'clamp(450px, 28vw, 850px)',  calcH: vw => Math.min(Math.max(450, vw * 0.28), 850) },
+  { key: 'extra-tall', label: 'Extra Tall',  clamp: 'clamp(600px, 38vw, 1100px)', calcH: vw => Math.min(Math.max(600, vw * 0.38), 1100) },
+  { key: 'custom',     label: 'Custom' },
+]
+
+// Returns { clamp, calcH } for the active height selection, using custom values when needed
+function resolveHeight(heightPreset, customMin, customVw, customMax) {
+  if (heightPreset === 'custom') {
+    const mn = customMin, mx = customMax, v = customVw / 100
+    return {
+      clamp: `clamp(${mn}px, ${customVw}vw, ${mx}px)`,
+      calcH: vw => Math.min(Math.max(mn, vw * v), mx),
+    }
+  }
+  return HEIGHT_PRESETS.find(h => h.key === heightPreset) || HEIGHT_PRESETS[1]
+}
+
+const PRESETS = [
+  { key: '2160p', label: '2160p (4K UHD)', width: 3840 },
+  { key: '1440p', label: '1440p (2K QHD)', width: 2560 },
+  { key: '1080p', label: '1080p (Full HD)', width: 1920 },
+  { key: '720p',  label: '720p (HD)',       width: 1280 },
+  { key: 'tablet', label: 'Tablet (540p)',   width: 960  },
+  { key: 'mobile', label: 'Mobile', width: null },
+]
+
+function clamp(val, min, max) {
+  return Math.min(Math.max(val, min), max)
+}
+
+function generateHtml({ src, alt, focalX, focalY, heightPreset, customMin, customVw, customMax }) {
+  const x = Math.round(focalX)
+  const y = Math.round(focalY)
+  const hp = resolveHeight(heightPreset, customMin, customVw, customMax)
+
+  return `<style>
   .hh-hero-container {
     width: 100%;
-    height: clamp(350px, 21vw, 700px);
+    height: ${hp.clamp};
     overflow: hidden;
     line-height: 0;
   }
@@ -24,26 +61,7 @@ const HERO_STYLES = `<style>
       height: auto;
     }
   }
-</style>`
-
-const heroHeight = (vw) => Math.min(Math.max(350, vw * 0.21), 700) // mirrors clamp(350px, 21vw, 550px)
-
-const PRESETS = [
-  { key: '2160p', label: '2160p (4K UHD)', width: 3840 },
-  { key: '1440p', label: '1440p (2K QHD)', width: 2560 },
-  { key: '1080p', label: '1080p (Full HD)', width: 1920 },
-  { key: '720p',  label: '720p (HD)',       width: 1280 },
-  { key: 'mobile', label: 'Mobile', width: null },
-]
-
-function clamp(val, min, max) {
-  return Math.min(Math.max(val, min), max)
-}
-
-function generateHtml({ src, alt, focalX, focalY }) {
-  const x = Math.round(focalX)
-  const y = Math.round(focalY)
-  return `${HERO_STYLES}
+</style>
 
 <div class="hh-hero-container">
   <img
@@ -86,12 +104,16 @@ export default function App() {
     focalY: 50,
     simPreset: '1080p',
     imgNatural: { w: 0, h: 0 },
+    heightPreset: 'standard',
+    customMin: 350,
+    customVw: 21,
+    customMax: 700,
   })
   const [altWarned, setAltWarned] = useState(false)
   const [copied, setCopied] = useState(false)
 
   // ── Derived values ──────────────────────────────────────────────────────────
-  const { mode, previewUrl, dnnFolder, dnnFile, urlInput, alt, focalX, focalY, simPreset, imgNatural } = state
+  const { mode, previewUrl, dnnFolder, dnnFile, urlInput, alt, focalX, focalY, simPreset, imgNatural, heightPreset, customMin, customVw, customMax } = state
 
   const dnnPath = dnnFolder + dnnFile
 
@@ -100,9 +122,10 @@ export default function App() {
   const hasAlt = alt.trim() !== ''
   const isComplete = hasImage && hasAlt
 
-  const html = isComplete ? generateHtml({ src: srcForOutput, alt, focalX, focalY }) : ''
+  const html = isComplete ? generateHtml({ src: srcForOutput, alt, focalX, focalY, heightPreset, customMin, customVw, customMax }) : ''
 
   const currentPreset = PRESETS.find(p => p.key === simPreset) || PRESETS[2]
+  const currentHeight = resolveHeight(heightPreset, customMin, customVw, customMax)
   const isMobile = simPreset === 'mobile'
   const showSizeWarning = !isMobile && imgNatural.w > 0 && currentPreset.width > imgNatural.w
 
@@ -116,14 +139,13 @@ export default function App() {
     if (!pickerW || !pickerH) return null
 
     // Hero crop region in image-space (0..1)
-    const hh = heroHeight(simWidth)
+    // CSS object-position X% means: cut (1 - visW) * X% from the left
+    const hh = currentHeight.calcH(simWidth)
     const heroScale = Math.max(simWidth / imgNatural.w, hh / imgNatural.h)
     const heroVisW = simWidth / (heroScale * imgNatural.w)
     const heroVisH = hh / (heroScale * imgNatural.h)
-    const cx = clamp(focalX / 100, heroVisW / 2, 1 - heroVisW / 2)
-    const cy = clamp(focalY / 100, heroVisH / 2, 1 - heroVisH / 2)
-    const heroLeft = cx - heroVisW / 2
-    const heroTop  = cy - heroVisH / 2
+    const heroLeft = (1 - heroVisW) * (focalX / 100)
+    const heroTop  = (1 - heroVisH) * (focalY / 100)
 
     // Picker's own visible region in image-space (object-cover, centered at 50/50)
     const pickerScale = Math.max(pickerW / imgNatural.w, pickerH / imgNatural.h)
@@ -198,6 +220,10 @@ export default function App() {
       focalY: 50,
       simPreset: '1080p',
       imgNatural: { w: 0, h: 0 },
+      heightPreset: 'standard',
+      customMin: 350,
+      customVw: 21,
+      customMax: 700,
     })
     setAltWarned(false)
     if (fileRef.current) fileRef.current.value = ''
@@ -386,6 +412,83 @@ export default function App() {
               )}
             </div>
 
+            {/* Section 4: Options */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 bg-blue-600 text-white">
+                  4
+                </div>
+                <h2 className="text-base font-semibold text-gray-800">Options</h2>
+              </div>
+
+              {/* Hero height */}
+              <div>
+                <label className="text-xs font-medium text-gray-700 block mb-1.5">Hero height</label>
+                <div className="flex gap-1 flex-wrap">
+                  {HEIGHT_PRESETS.map(h => (
+                    <button
+                      key={h.key}
+                      onClick={() => setState(s => ({ ...s, heightPreset: h.key }))}
+                      className={`px-2.5 py-1 rounded-lg border text-xs font-medium transition-colors
+                        ${heightPreset === h.key
+                          ? 'border-blue-600 bg-blue-50 text-blue-700'
+                          : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'}`}
+                    >
+                      {h.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-1 text-xs text-gray-400">
+                  {heightPreset === 'short'      ? <>Compact banner. Only for very flat/wide subjects, like the horizon.<span className="block font-mono mt-0.5">clamp(220px, 13vw, 440px)</span></> :
+                   heightPreset === 'standard'   ? <>Default height. Requires a not-too-tall subject.<span className="block font-mono mt-0.5">clamp(350px, 21vw, 700px)</span></> :
+                   heightPreset === 'tall'       ? <>Taller banner. Shows more of a tall subject.<span className="block font-mono mt-0.5">clamp(450px, 28vw, 850px)</span></> :
+                   heightPreset === 'extra-tall' ? <>Very tall banner. Significant vertical coverage.<span className="block font-mono mt-0.5">clamp(600px, 38vw, 1100px)</span></> :
+                                                   <>
+                                                     <span className="block">Set each clamp value manually.</span>
+                                                     <span className="block mt-1"><span className="font-mono">Min</span> and <span className="font-mono">Max</span> are the shortest and tallest the hero can ever be, in pixels.</span>
+                                                     <span className="block mt-1"><span className="font-mono">Preferred (vw)</span> is the hero's height as a percentage of the page width — wider browser window, taller hero, so it always looks proportional.</span>
+                                                   </>}
+                </p>
+
+                {/* Custom clamp inputs */}
+                {heightPreset === 'custom' && (
+                  <div className="mt-2 grid grid-cols-3 gap-2">
+                    {[
+                      { label: 'Min (px)', key: 'customMin', value: customMin, min: 50, max: customMax - 1 },
+                      { label: 'Preferred (vw)', key: 'customVw', value: customVw, min: 1, max: 100 },
+                      { label: 'Max (px)', key: 'customMax', value: customMax, min: customMin + 1, max: 2000 },
+                    ].map(({ label, key, value, min, max }) => (
+                      <div key={key}>
+                        <label className="block text-[10px] text-gray-500 mb-0.5">{label}</label>
+                        <input
+                          type="number"
+                          value={value}
+                          min={min}
+                          max={max}
+                          onChange={e => {
+                            const n = parseInt(e.target.value, 10)
+                            if (!isNaN(n)) setState(s => ({ ...s, [key]: Math.min(Math.max(n, min), max) }))
+                          }}
+                          className="w-full px-2 py-1 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                        />
+                      </div>
+                    ))}
+                    <div className="col-span-3 flex items-center justify-between">
+                      <p className="text-[10px] text-gray-400 font-mono">
+                        → clamp({customMin}px, {customVw}vw, {customMax}px)
+                      </p>
+                      <button
+                        onClick={() => setState(s => ({ ...s, customMin: 350, customVw: 21, customMax: 700 }))}
+                        className="text-[10px] text-blue-500 hover:text-blue-700 underline"
+                      >
+                        Reset to default
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
           </div>
 
           {/* ── RIGHT: preview + HTML (stacked on lg, side-by-side on xl) ── */}
@@ -431,7 +534,7 @@ export default function App() {
                 ) : (
                   <div
                     className="w-full overflow-hidden"
-                    style={{ aspectRatio: `${currentPreset.width} / ${heroHeight(currentPreset.width)}` }}
+                    style={{ aspectRatio: `${currentPreset.width} / ${currentHeight.calcH(currentPreset.width)}` }}
                   >
                     <img
                       src={previewUrl}
@@ -462,7 +565,7 @@ export default function App() {
             <div className="w-full xl:w-96 shrink-0">
               <div className={`bg-white rounded-xl shadow-sm border p-4 transition-opacity
                 ${isComplete ? 'border-gray-100 opacity-100' : 'border-gray-100 opacity-50 pointer-events-none'}`}>
-                <SectionLabel number={4} title="Your HTML code" done={false} />
+                <SectionLabel number={5} title="Your HTML code" done={false} />
 
                 {isComplete ? (
                   <>

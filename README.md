@@ -8,8 +8,9 @@ A web tool for generating hero image HTML. Designed for non-technical folks who 
 
 1. **Image source** — choose a file on your PC or enter a URL
 2. **Alt text** — required for accessibility
-3. **Focal point** — click the image preview to set `object-position` so the subject stays visible on all screen sizes
-4. **Copy HTML** — one snippet with `<style>` + markup, ready to paste
+3. **Focal point** — click the image preview to set `object-position` so the subject stays visible on all screen sizes; simulate different viewport widths (4K → Tablet → Mobile) to verify the crop
+4. **Hero height** — choose Short / Standard / Tall / Extra Tall, or set a fully custom `clamp()` value; taller containers show more of a tall subject
+5. **Copy HTML** — one snippet with `<style>` + markup, ready to paste
 
 ## Development
 
