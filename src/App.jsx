@@ -73,7 +73,7 @@ function generateHtml({ src, alt, focalX, focalY, heightPreset, customMin, custo
 </div>`
 }
 
-const STORAGE_KEY = 'hh-dnn-folder'
+const STORAGE_KEY = 'heroHelper-dnn-folder'
 
 // ── Section label ────────────────────────────────────────────────────────────
 function SectionLabel({ number, title, done }) {
