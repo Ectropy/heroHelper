@@ -2,8 +2,8 @@ name: Build and Deploy
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -17,9 +17,22 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      has_version_tag: ${{ steps.check_tag.outputs.has_version_tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for version tag on HEAD
+        id: check_tag
+        run: |
+          if git describe --exact-match --match 'v*' HEAD 2>/dev/null; then
+            echo "has_version_tag=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_version_tag=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -42,6 +55,7 @@ jobs:
           path: ./dist
 
   deploy:
+    if: needs.build.outputs.has_version_tag == 'true'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
