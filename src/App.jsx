@@ -55,7 +55,7 @@ function generateHtml({ src, alt, focalX, focalY }) {
 </div>`
 }
 
-const STORAGE_KEY = 'hh-dnn-path'
+const STORAGE_KEY = 'hh-dnn-folder'
 
 // ── Section label ────────────────────────────────────────────────────────────
 function SectionLabel({ number, title, done }) {
@@ -77,7 +77,8 @@ export default function App() {
   const [state, setState] = useState({
     mode: 'pc',
     previewUrl: '',
-    dnnPath: localStorage.getItem(STORAGE_KEY) || '',
+    dnnFolder: localStorage.getItem(STORAGE_KEY) || '',
+    dnnFile: '',
     urlInput: '',
     src: '',
     alt: '',
@@ -90,11 +91,9 @@ export default function App() {
   const [copied, setCopied] = useState(false)
 
   // ── Derived values ──────────────────────────────────────────────────────────
-  const { mode, previewUrl, dnnPath, urlInput, alt, focalX, focalY, simPreset, imgNatural } = state
+  const { mode, previewUrl, dnnFolder, dnnFile, urlInput, alt, focalX, focalY, simPreset, imgNatural } = state
 
-  const lastSlash = dnnPath.lastIndexOf('/')
-  const dnnFolder = lastSlash >= 0 ? dnnPath.slice(0, lastSlash + 1) : ''
-  const dnnFilename = lastSlash >= 0 ? dnnPath.slice(lastSlash + 1) : dnnPath
+  const dnnPath = dnnFolder + dnnFile
 
   const srcForOutput = mode === 'url' ? urlInput : dnnPath
   const hasImage = mode === 'url' ? urlInput.trim() !== '' : (previewUrl !== '' && dnnPath.trim() !== '')
@@ -148,23 +147,17 @@ export default function App() {
     const file = e.target.files[0]
     if (!file) return
     const objectUrl = URL.createObjectURL(file)
-    setState(s => {
-      const ls = s.dnnPath.lastIndexOf('/')
-      const folder = ls >= 0 ? s.dnnPath.slice(0, ls + 1) : ''
-      const newPath = folder + file.name
-      localStorage.setItem(STORAGE_KEY, newPath)
-      return { ...s, previewUrl: objectUrl, dnnPath: newPath, imgNatural: { w: 0, h: 0 } }
-    })
+    setState(s => ({ ...s, previewUrl: objectUrl, dnnFile: file.name, imgNatural: { w: 0, h: 0 } }))
   }
 
   const handleDnnFolder = (val) => {
-    const newPath = val + dnnFilename
-    localStorage.setItem(STORAGE_KEY, newPath)
-    setState(s => ({ ...s, dnnPath: newPath }))
+    const clean = val.replace(/[^a-zA-Z0-9/_\-. ]/g, '')
+    localStorage.setItem(STORAGE_KEY, clean)
+    setState(s => ({ ...s, dnnFolder: clean }))
   }
 
   const handleModeChange = (newMode) => {
-    setState(s => ({ ...s, mode: newMode, previewUrl: '', urlInput: '', dnnPath: '', imgNatural: { w: 0, h: 0 } }))
+    setState(s => ({ ...s, mode: newMode, previewUrl: '', urlInput: '', dnnFile: '', imgNatural: { w: 0, h: 0 } }))
     if (fileRef.current) fileRef.current.value = ''
   }
 
@@ -195,7 +188,8 @@ export default function App() {
     setState({
       mode: 'pc',
       previewUrl: '',
-      dnnPath: localStorage.getItem(STORAGE_KEY) || '',
+      dnnFolder: localStorage.getItem(STORAGE_KEY) || '',
+      dnnFile: '',
       urlInput: '',
       src: '',
       alt: '',
@@ -281,7 +275,7 @@ export default function App() {
                         className="flex-1 min-w-0 px-2 py-1.5 text-xs focus:outline-none"
                       />
                       <div className="flex items-center px-2 py-1.5 bg-gray-50 border-l border-gray-300 text-xs text-gray-500 font-mono whitespace-nowrap max-w-[40%] overflow-hidden text-ellipsis">
-                        {dnnFilename || <span className="text-gray-300 italic font-sans">filename</span>}
+                        {dnnFile || <span className="text-gray-300 italic font-sans">filename</span>}
                       </div>
                     </div>
                     {dnnPath
@@ -317,8 +311,9 @@ export default function App() {
                 type="text"
                 value={alt}
                 onChange={e => {
-                  setState(s => ({ ...s, alt: e.target.value }))
-                  if (e.target.value.trim()) setAltWarned(false)
+                  const clean = e.target.value.replace(/[<>"]/g, '')
+                  setState(s => ({ ...s, alt: clean }))
+                  if (clean.trim()) setAltWarned(false)
                 }}
                 onBlur={() => { if (!alt.trim()) setAltWarned(true) }}
                 placeholder="e.g. Aerial view of the main campus on a sunny day"
