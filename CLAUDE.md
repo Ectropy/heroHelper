@@ -31,10 +31,10 @@ Single-page React app (`src/App.jsx`) — no routing, no state management librar
 Uses CSS `object-position` semantics: `heroLeft = (1 - heroVisW) * (focalX / 100)`. The picker image is always centered at 50/50 (default object-position), so picker offsets use `0.5 - pickerVisW/2`. The overlay is positioned in picker-display-space by mapping the hero's image-space rect through the picker's visible image-space rect.
 
 ### Output format
-`generateHtml()` produces an inline `style="object-position: X% Y%;"` on the `<img>` (never preset classes). The `height` property on `.hh-hero-container` uses a `clamp()` value from the active height preset. The output includes a self-contained `<style>` block + `<div>`/`<img>` markup for one-paste use in a DNN Text/HTML module.
+`generateHtml()` produces an inline `style="object-position: X% Y%;"` on the `<img>` (never preset classes). The `height` property on `.heroHelper-hero-container` uses a `clamp()` value from the active height preset. The output includes a self-contained `<style>` block + `<div>`/`<img>` markup for one-paste use in a DNN Text/HTML module.
 
 ### CSS class naming
-`hh-` prefix (`hh-hero-container`, `hh-hero-image`) minimises collision with unknown DNN theme styles.
+`heroHelper-` prefix (`heroHelper-hero-container`, `heroHelper-hero-image`) minimises collision with unknown DNN theme styles.
 
 ## Deploy
 `vite.config.js` sets `base: '/heroHelper/'` for GitHub Pages. Build `dist/` and push to the `gh-pages` branch.

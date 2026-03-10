@@ -40,32 +40,32 @@ function generateHtml({ src, alt, focalX, focalY, heightPreset, customMin, custo
   const hp = resolveHeight(heightPreset, customMin, customVw, customMax)
 
   return `<style>
-  .hh-hero-container {
+  .heroHelper-hero-container {
     width: 100%;
     height: ${hp.clamp};
     overflow: hidden;
     line-height: 0;
   }
-  .hh-hero-container .hh-hero-image {
+  .heroHelper-hero-container .heroHelper-hero-image {
     width: 100%;
     height: 100%;
     object-fit: cover;
     display: block;
   }
   @media (max-width: 767.98px) {
-    .hh-hero-container {
+    .heroHelper-hero-container {
       height: auto;
     }
-    .hh-hero-container .hh-hero-image {
+    .heroHelper-hero-container .heroHelper-hero-image {
       object-fit: contain;
       height: auto;
     }
   }
 </style>
 
-<div class="hh-hero-container">
+<div class="heroHelper-hero-container">
   <img
-    class="hh-hero-image"
+    class="heroHelper-hero-image"
     style="object-position: ${x}% ${y}%;"
     src="${src}"
     alt="${alt}"
