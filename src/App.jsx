@@ -204,8 +204,8 @@ export default function App() {
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 py-8 px-4">
-      <div className="w-full">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col">
+      <div className="flex-1 w-full py-8 px-4">
 
         {/* Header */}
         <div className="mb-6">
@@ -503,8 +503,10 @@ export default function App() {
           </div>{/* ── END RIGHT WRAPPER ── */}
         </div>
 
-        <p className="text-center text-xs text-gray-400 mt-6">Created by Ectropy</p>
       </div>
+      <footer className="px-2 py-1 bg-white flex-shrink-0 flex justify-center sm:justify-end">
+        <span className="text-[10px] text-gray-400 leading-none">Hero Helper v{__APP_VERSION__} • <a className="underline hover:text-blue-500" href="https://github.com/Ectropy/heroHelper" target="_blank" rel="noreferrer">View on GitHub</a></span>
+      </footer>
     </div>
   )
 }
