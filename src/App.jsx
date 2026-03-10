@@ -5,7 +5,7 @@ import { useState, useRef, useCallback } from 'react'
 const HERO_STYLES = `<style>
   .hh-hero-container {
     width: 100%;
-    height: 400px;
+    height: clamp(350px, 21vw, 700px);
     overflow: hidden;
     line-height: 0;
   }
@@ -26,7 +26,7 @@ const HERO_STYLES = `<style>
   }
 </style>`
 
-const HERO_HEIGHT = 400 // px — must match the CSS above
+const heroHeight = (vw) => Math.min(Math.max(350, vw * 0.21), 700) // mirrors clamp(350px, 21vw, 550px)
 
 const PRESETS = [
   { key: '2160p', label: '2160p (4K UHD)', width: 3840 },
@@ -116,9 +116,10 @@ export default function App() {
     if (!pickerW || !pickerH) return null
 
     // Hero crop region in image-space (0..1)
-    const heroScale = Math.max(simWidth / imgNatural.w, HERO_HEIGHT / imgNatural.h)
+    const hh = heroHeight(simWidth)
+    const heroScale = Math.max(simWidth / imgNatural.w, hh / imgNatural.h)
     const heroVisW = simWidth / (heroScale * imgNatural.w)
-    const heroVisH = HERO_HEIGHT / (heroScale * imgNatural.h)
+    const heroVisH = hh / (heroScale * imgNatural.h)
     const cx = clamp(focalX / 100, heroVisW / 2, 1 - heroVisW / 2)
     const cy = clamp(focalY / 100, heroVisH / 2, 1 - heroVisH / 2)
     const heroLeft = cx - heroVisW / 2
@@ -205,13 +206,13 @@ export default function App() {
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col">
-      <div className="flex-1 w-full py-8 px-4">
+      <div className="flex-1 w-full py-2 px-4">
 
         {/* Header */}
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Hero Helper</h1>
           <p className="mt-0.5 text-sm text-gray-500">
-            Quickly generate hero image HTML for any image.
+            Easily generate hero image HTML for any image.
           </p>
         </div>
 
@@ -228,8 +229,8 @@ export default function App() {
               {/* Mode toggle */}
               <div className="flex gap-2 mb-4">
                 {[
-                  { id: 'pc', label: 'Upload from PC' },
-                  { id: 'url', label: 'Use a URL' },
+                  { id: 'pc', label: 'Image on this PC' },
+                  { id: 'url', label: 'Image at a URL' },
                 ].map(({ id, label }) => (
                   <button
                     key={id}
@@ -254,7 +255,7 @@ export default function App() {
                     <input
                       ref={fileRef}
                       type="file"
-                      accept="image/*"
+                      accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml,image/avif"
                       onChange={handleFileChange}
                       className="block w-full text-xs text-gray-600
                         file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0
@@ -374,7 +375,7 @@ export default function App() {
                     )}
                   </div>
                   <p className="mt-1 text-xs text-gray-400">
-                    Focal point: <span className="font-mono text-gray-500">{focalX}% from left, {focalY}% from top</span>.
+                    Focal point: <span className="font-mono text-gray-500">{focalX}% from left, {focalY}% from top</span>.<br/>
                     {cropOverlay && <> Yellow box = crop at <span className="font-medium text-gray-500">{currentPreset.label}</span>.</>}
                   </p>
                 </>
@@ -430,7 +431,7 @@ export default function App() {
                 ) : (
                   <div
                     className="w-full overflow-hidden"
-                    style={{ aspectRatio: `${currentPreset.width} / ${HERO_HEIGHT}` }}
+                    style={{ aspectRatio: `${currentPreset.width} / ${heroHeight(currentPreset.width)}` }}
                   >
                     <img
                       src={previewUrl}
@@ -466,7 +467,7 @@ export default function App() {
                 {isComplete ? (
                   <>
                     <p className="text-xs text-gray-500 mb-3">
-                      Copy and paste into your DNN Text/HTML module.
+                      Copy and paste into your HTML.
                     </p>
                     <div className="bg-gray-900 rounded-lg overflow-hidden">
                       <div className="flex items-center justify-between px-3 py-2 border-b border-gray-700">
