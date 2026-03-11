@@ -115,7 +115,9 @@ export default function App() {
   // ── Derived values ──────────────────────────────────────────────────────────
   const { mode, previewUrl, dnnFolder, dnnFile, urlInput, alt, focalX, focalY, simPreset, imgNatural, heightPreset, customMin, customVw, customMax } = state
 
-  const dnnPath = dnnFolder + dnnFile
+  const dnnPath = dnnFolder && dnnFile
+    ? dnnFolder.replace(/\/?$/, '/') + dnnFile
+    : dnnFolder + dnnFile
 
   const srcForOutput = mode === 'url' ? urlInput : dnnPath
   const hasImage = mode === 'url' ? urlInput.trim() !== '' : (previewUrl !== '' && dnnPath.trim() !== '')
