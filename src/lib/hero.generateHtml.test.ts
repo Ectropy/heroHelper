@@ -1,0 +1,99 @@
+import { describe, it, expect } from 'vitest'
+import { generateHtml, type GenerateHtmlInput } from './hero'
+
+const baseInput: GenerateHtmlInput = {
+  src: 'https://example.com/img.jpg',
+  alt: 'A red barn',
+  focalX: 50,
+  focalY: 50,
+  heightPreset: 'standard',
+  customMin: 350,
+  customVw: 21,
+  customMax: 700,
+}
+
+describe('generateHtml', () => {
+  describe('focal point', () => {
+    it('embeds focal coords as inline style on the <img>', () => {
+      const html = generateHtml({ ...baseInput, focalX: 33, focalY: 67 })
+      expect(html).toContain('style="object-position: 33% 67%;"')
+    })
+
+    it('rounds fractional focal coords to integers', () => {
+      const html = generateHtml({ ...baseInput, focalX: 33.4, focalY: 66.6 })
+      expect(html).toContain('object-position: 33% 67%')
+      expect(html).not.toContain('33.4')
+      expect(html).not.toContain('66.6')
+    })
+
+    it('uses object-position style (never preset classes)', () => {
+      const html = generateHtml(baseInput)
+      expect(html).toContain('object-position:')
+      expect(html).not.toMatch(/class="[^"]*\bfocal-/)
+    })
+  })
+
+  describe('height preset → clamp', () => {
+    it.each([
+      ['short',      'clamp(220px, 13vw, 440px)'],
+      ['standard',   'clamp(350px, 21vw, 700px)'],
+      ['tall',       'clamp(450px, 28vw, 850px)'],
+      ['extra-tall', 'clamp(600px, 38vw, 1100px)'],
+    ] as const)('embeds the %s preset as height: %s', (preset, expected) => {
+      const html = generateHtml({ ...baseInput, heightPreset: preset })
+      expect(html).toContain(`height: ${expected};`)
+    })
+
+    it('embeds custom clamp() built from customMin/customVw/customMax', () => {
+      const html = generateHtml({
+        ...baseInput,
+        heightPreset: 'custom',
+        customMin: 280,
+        customVw: 18,
+        customMax: 620,
+      })
+      expect(html).toContain('height: clamp(280px, 18vw, 620px);')
+    })
+  })
+
+  describe('content interpolation', () => {
+    it('embeds src verbatim', () => {
+      const html = generateHtml({ ...baseInput, src: '/Portals/0/Images/campus.jpg' })
+      expect(html).toContain('src="/Portals/0/Images/campus.jpg"')
+    })
+
+    it('embeds alt verbatim', () => {
+      const html = generateHtml({ ...baseInput, alt: 'Aerial view of the main campus' })
+      expect(html).toContain('alt="Aerial view of the main campus"')
+    })
+  })
+
+  describe('static markup contracts', () => {
+    it('always emits the mobile media query block', () => {
+      const html = generateHtml(baseInput)
+      expect(html).toContain('@media (max-width: 767.98px)')
+      expect(html).toContain('object-fit: contain')
+    })
+
+    it('uses heroHelper-prefixed class names', () => {
+      const html = generateHtml(baseInput)
+      expect(html).toContain('class="heroHelper-hero-container"')
+      expect(html).toContain('class="heroHelper-hero-image"')
+    })
+
+    it('emits a single <style> block followed by a single <div>/<img>', () => {
+      const html = generateHtml(baseInput)
+      expect(html.match(/<style>/g)).toHaveLength(1)
+      expect(html.match(/<\/style>/g)).toHaveLength(1)
+      expect(html.match(/<div /g)).toHaveLength(1)
+      expect(html.match(/<img/g)).toHaveLength(1)
+    })
+
+    it('uses object-fit: cover on the desktop image rule', () => {
+      const html = generateHtml(baseInput)
+      // The desktop rule appears before the @media block.
+      const desktopSection = html.split('@media')[0]
+      expect(desktopSection).toContain('object-fit: cover')
+    })
+  })
+})

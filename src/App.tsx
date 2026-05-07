@@ -1,34 +1,17 @@
 import { useState, useRef, useCallback, type ChangeEvent, type MouseEvent, type SyntheticEvent } from 'react'
+import {
+  HEIGHT_PRESETS,
+  PRESETS,
+  resolveHeight,
+  safeImageUrl,
+  generateHtml,
+  computeCropOverlay,
+  type HeightPresetKey,
+  type SimPresetKey,
+} from './lib/hero'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 type Mode = 'pc' | 'url'
-type SimPresetKey = '2160p' | '1440p' | '1080p' | '720p' | 'tablet' | 'mobile'
-type HeightPresetKey = 'short' | 'standard' | 'tall' | 'extra-tall' | 'custom'
-
-interface HeightPreset {
-  key: HeightPresetKey
-  label: string
-  clamp?: string
-  calcH?: (vw: number) => number
-}
-
-interface SimPreset {
-  key: SimPresetKey
-  label: string
-  width: number | null
-}
-
-interface ResolvedHeight {
-  clamp: string
-  calcH: (vw: number) => number
-}
-
-interface CropOverlay {
-  left: number
-  top: number
-  width: number
-  height: number
-}
 
 interface State {
   mode: Mode
@@ -49,102 +32,6 @@ interface State {
 }
 
 type CustomKey = 'customMin' | 'customVw' | 'customMax'
-
-interface GenerateHtmlInput {
-  src: string
-  alt: string
-  focalX: number
-  focalY: number
-  heightPreset: HeightPresetKey
-  customMin: number
-  customVw: number
-  customMax: number
-}
-
-// Each preset: label, CSS clamp string for generated output, and calcH(vw) for crop math
-const HEIGHT_PRESETS: HeightPreset[] = [
-  { key: 'short',      label: 'Short',       clamp: 'clamp(220px, 13vw, 440px)',  calcH: vw => Math.min(Math.max(220, vw * 0.13), 440) },
-  { key: 'standard',   label: 'Standard',    clamp: 'clamp(350px, 21vw, 700px)',  calcH: vw => Math.min(Math.max(350, vw * 0.21), 700) },
-  { key: 'tall',       label: 'Tall',        clamp: 'clamp(450px, 28vw, 850px)',  calcH: vw => Math.min(Math.max(450, vw * 0.28), 850) },
-  { key: 'extra-tall', label: 'Extra Tall',  clamp: 'clamp(600px, 38vw, 1100px)', calcH: vw => Math.min(Math.max(600, vw * 0.38), 1100) },
-  { key: 'custom',     label: 'Custom' },
-]
-
-// Returns { clamp, calcH } for the active height selection, using custom values when needed
-function resolveHeight(heightPreset: HeightPresetKey, customMin: number, customVw: number, customMax: number): ResolvedHeight {
-  if (heightPreset === 'custom') {
-    const mn = customMin, mx = customMax, v = customVw / 100
-    return {
-      clamp: `clamp(${mn}px, ${customVw}vw, ${mx}px)`,
-      calcH: vw => Math.min(Math.max(mn, vw * v), mx),
-    }
-  }
-  const preset = HEIGHT_PRESETS.find(h => h.key === heightPreset) ?? HEIGHT_PRESETS[1]
-  // Non-custom presets always have clamp/calcH defined; the fallback (standard) does too.
-  return { clamp: preset.clamp!, calcH: preset.calcH! }
-}
-
-// Returns the input unchanged if it is a safe image URL (http(s) absolute, or
-// root-relative path like "/Portals/0/Images/foo.jpg"); otherwise returns ''.
-// Single source of truth for any URL flowing into <img src> or generated HTML.
-function safeImageUrl(input: string): string {
-  const trimmed = input.trim()
-  if (!trimmed) return ''
-  if (trimmed.startsWith('/') && !trimmed.startsWith('//')) return trimmed
-  try {
-    const u = new URL(trimmed)
-    if (u.protocol === 'http:' || u.protocol === 'https:') return trimmed
-  } catch { /* not a parseable URL */ }
-  return ''
-}
-
-const PRESETS: SimPreset[] = [
-  { key: '2160p', label: '2160p (4K UHD)', width: 3840 },
-  { key: '1440p', label: '1440p (2K QHD)', width: 2560 },
-  { key: '1080p', label: '1080p (Full HD)', width: 1920 },
-  { key: '720p',  label: '720p (HD)',       width: 1280 },
-  { key: 'tablet', label: 'Tablet (540p)',   width: 960  },
-  { key: 'mobile', label: 'Mobile', width: null },
-]
-
-function generateHtml({ src, alt, focalX, focalY, heightPreset, customMin, customVw, customMax }: GenerateHtmlInput): string {
-  const x = Math.round(focalX)
-  const y = Math.round(focalY)
-  const hp = resolveHeight(heightPreset, customMin, customVw, customMax)
-
-  return `<style>
-  .heroHelper-hero-container {
-    width: 100%;
-    height: ${hp.clamp};
-    overflow: hidden;
-    line-height: 0;
-  }
-  .heroHelper-hero-container .heroHelper-hero-image {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-  }
-  @media (max-width: 767.98px) {
-    .heroHelper-hero-container {
-      height: auto;
-    }
-    .heroHelper-hero-container .heroHelper-hero-image {
-      object-fit: contain;
-      height: auto;
-    }
-  }
-</style>
-
-<div class="heroHelper-hero-container">
-  <img
-    class="heroHelper-hero-image"
-    style="object-position: ${x}% ${y}%;"
-    src="${src}"
-    alt="${alt}"
-  >
-</div>`
-}
 
 const STORAGE_KEY = 'heroHelper-dnn-folder'
 
@@ -210,44 +97,20 @@ export default function App() {
   const isMobile = simPreset === 'mobile'
   const showSizeWarning = !isMobile && imgNatural.w > 0 && currentPreset.width !== null && currentPreset.width > imgNatural.w
 
-  // ── Crop overlay math ────────────────────────────────────────────────────────
-  // Returns % coords (relative to picker display area) for the dashed crop rectangle.
-  function getCropOverlay(): CropOverlay | null {
-    if (isMobile || !imgNatural.w || !imgNatural.h || !pickerRef.current || currentPreset.width === null) return null
-    const simWidth = currentPreset.width
-    const pickerW = pickerRef.current.offsetWidth
-    const pickerH = pickerRef.current.offsetHeight
-    if (!pickerW || !pickerH) return null
-
-    // Hero crop region in image-space (0..1)
-    // CSS object-position X% means: cut (1 - visW) * X% from the left
-    const hh = currentHeight.calcH(simWidth)
-    const heroScale = Math.max(simWidth / imgNatural.w, hh / imgNatural.h)
-    const heroVisW = simWidth / (heroScale * imgNatural.w)
-    const heroVisH = hh / (heroScale * imgNatural.h)
-    const heroLeft = (1 - heroVisW) * (focalX / 100)
-    const heroTop  = (1 - heroVisH) * (focalY / 100)
-
-    // Picker's own visible region in image-space (object-cover, centered at 50/50)
-    const pickerScale = Math.max(pickerW / imgNatural.w, pickerH / imgNatural.h)
-    const pickerVisW  = pickerW / (pickerScale * imgNatural.w)
-    const pickerVisH  = pickerH / (pickerScale * imgNatural.h)
-    const pickerLeft  = 0.5 - pickerVisW / 2
-    const pickerTop   = 0.5 - pickerVisH / 2
-
-    // Map hero rect to picker display space (%)
-    return {
-      left:   (heroLeft - pickerLeft) / pickerVisW * 100,
-      top:    (heroTop  - pickerTop)  / pickerVisH * 100,
-      width:  heroVisW / pickerVisW * 100,
-      height: heroVisH / pickerVisH * 100,
-    }
-  }
-
   // Reads pickerRef.current.offsetWidth/Height at render time. Re-runs whenever
   // state changes (e.g. focal point click, image load) so values stay current.
   // eslint-disable-next-line react-hooks/refs
-  const cropOverlay = previewUrl ? getCropOverlay() : null
+  const cropOverlay = previewUrl && pickerRef.current && !isMobile && currentPreset.width !== null
+    ? computeCropOverlay({
+        imgNatural,
+        pickerW: pickerRef.current.offsetWidth,
+        pickerH: pickerRef.current.offsetHeight,
+        simWidth: currentPreset.width,
+        heroHeight: currentHeight.calcH(currentPreset.width),
+        focalX,
+        focalY,
+      })
+    : null
 
   // ── Handlers ────────────────────────────────────────────────────────────────
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
