@@ -84,6 +84,20 @@ function resolveHeight(heightPreset: HeightPresetKey, customMin: number, customV
   return { clamp: preset.clamp!, calcH: preset.calcH! }
 }
 
+// Returns the input unchanged if it is a safe image URL (http(s) absolute, or
+// root-relative path like "/Portals/0/Images/foo.jpg"); otherwise returns ''.
+// Single source of truth for any URL flowing into <img src> or generated HTML.
+function safeImageUrl(input: string): string {
+  const trimmed = input.trim()
+  if (!trimmed) return ''
+  if (trimmed.startsWith('/') && !trimmed.startsWith('//')) return trimmed
+  try {
+    const u = new URL(trimmed)
+    if (u.protocol === 'http:' || u.protocol === 'https:') return trimmed
+  } catch { /* not a parseable URL */ }
+  return ''
+}
+
 const PRESETS: SimPreset[] = [
   { key: '2160p', label: '2160p (4K UHD)', width: 3840 },
   { key: '1440p', label: '1440p (2K QHD)', width: 2560 },
@@ -184,7 +198,7 @@ export default function App() {
     ? dnnFolder.replace(/\/?$/, '/') + dnnFile
     : dnnFolder + dnnFile
 
-  const srcForOutput = mode === 'url' ? urlInput : dnnPath
+  const srcForOutput = mode === 'url' ? safeImageUrl(urlInput) : dnnPath
   const hasImage = mode === 'url' ? urlInput.trim() !== '' : (previewUrl !== '' && dnnPath.trim() !== '')
   const hasAlt = alt.trim() !== ''
   const isComplete = hasImage && hasAlt
@@ -255,8 +269,7 @@ export default function App() {
   }
 
   const handleUrlInput = (val: string) => {
-    const safePreview = /^(https?:\/\/|\/)/i.test(val.trim()) ? val : ''
-    setState(s => ({ ...s, urlInput: val, previewUrl: safePreview, imgNatural: { w: 0, h: 0 } }))
+    setState(s => ({ ...s, urlInput: val, previewUrl: safeImageUrl(val), imgNatural: { w: 0, h: 0 } }))
   }
 
   const handleFocalClick = useCallback((e: MouseEvent<HTMLDivElement>) => {
