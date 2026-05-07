@@ -187,7 +187,8 @@ export default function App() {
   }
 
   const handleUrlInput = (val) => {
-    setState(s => ({ ...s, urlInput: val, previewUrl: val, imgNatural: { w: 0, h: 0 } }))
+    const safePreview = /^(https?:\/\/|\/)/i.test(val.trim()) ? val : ''
+    setState(s => ({ ...s, urlInput: val, previewUrl: safePreview, imgNatural: { w: 0, h: 0 } }))
   }
 
   const handleFocalClick = useCallback((e) => {
