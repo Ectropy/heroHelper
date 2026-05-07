@@ -1,7 +1,68 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, type ChangeEvent, type MouseEvent, type SyntheticEvent } from 'react'
+
+// ── Types ────────────────────────────────────────────────────────────────────
+type Mode = 'pc' | 'url'
+type SimPresetKey = '2160p' | '1440p' | '1080p' | '720p' | 'tablet' | 'mobile'
+type HeightPresetKey = 'short' | 'standard' | 'tall' | 'extra-tall' | 'custom'
+
+interface HeightPreset {
+  key: HeightPresetKey
+  label: string
+  clamp?: string
+  calcH?: (vw: number) => number
+}
+
+interface SimPreset {
+  key: SimPresetKey
+  label: string
+  width: number | null
+}
+
+interface ResolvedHeight {
+  clamp: string
+  calcH: (vw: number) => number
+}
+
+interface CropOverlay {
+  left: number
+  top: number
+  width: number
+  height: number
+}
+
+interface State {
+  mode: Mode
+  previewUrl: string
+  dnnFolder: string
+  dnnFile: string
+  urlInput: string
+  src: string
+  alt: string
+  focalX: number
+  focalY: number
+  simPreset: SimPresetKey
+  imgNatural: { w: number; h: number }
+  heightPreset: HeightPresetKey
+  customMin: number
+  customVw: number
+  customMax: number
+}
+
+type CustomKey = 'customMin' | 'customVw' | 'customMax'
+
+interface GenerateHtmlInput {
+  src: string
+  alt: string
+  focalX: number
+  focalY: number
+  heightPreset: HeightPresetKey
+  customMin: number
+  customVw: number
+  customMax: number
+}
 
 // Each preset: label, CSS clamp string for generated output, and calcH(vw) for crop math
-const HEIGHT_PRESETS = [
+const HEIGHT_PRESETS: HeightPreset[] = [
   { key: 'short',      label: 'Short',       clamp: 'clamp(220px, 13vw, 440px)',  calcH: vw => Math.min(Math.max(220, vw * 0.13), 440) },
   { key: 'standard',   label: 'Standard',    clamp: 'clamp(350px, 21vw, 700px)',  calcH: vw => Math.min(Math.max(350, vw * 0.21), 700) },
   { key: 'tall',       label: 'Tall',        clamp: 'clamp(450px, 28vw, 850px)',  calcH: vw => Math.min(Math.max(450, vw * 0.28), 850) },
@@ -10,7 +71,7 @@ const HEIGHT_PRESETS = [
 ]
 
 // Returns { clamp, calcH } for the active height selection, using custom values when needed
-function resolveHeight(heightPreset, customMin, customVw, customMax) {
+function resolveHeight(heightPreset: HeightPresetKey, customMin: number, customVw: number, customMax: number): ResolvedHeight {
   if (heightPreset === 'custom') {
     const mn = customMin, mx = customMax, v = customVw / 100
     return {
@@ -18,10 +79,12 @@ function resolveHeight(heightPreset, customMin, customVw, customMax) {
       calcH: vw => Math.min(Math.max(mn, vw * v), mx),
     }
   }
-  return HEIGHT_PRESETS.find(h => h.key === heightPreset) || HEIGHT_PRESETS[1]
+  const preset = HEIGHT_PRESETS.find(h => h.key === heightPreset) ?? HEIGHT_PRESETS[1]
+  // Non-custom presets always have clamp/calcH defined; the fallback (standard) does too.
+  return { clamp: preset.clamp!, calcH: preset.calcH! }
 }
 
-const PRESETS = [
+const PRESETS: SimPreset[] = [
   { key: '2160p', label: '2160p (4K UHD)', width: 3840 },
   { key: '1440p', label: '1440p (2K QHD)', width: 2560 },
   { key: '1080p', label: '1080p (Full HD)', width: 1920 },
@@ -30,11 +93,7 @@ const PRESETS = [
   { key: 'mobile', label: 'Mobile', width: null },
 ]
 
-function clamp(val, min, max) {
-  return Math.min(Math.max(val, min), max)
-}
-
-function generateHtml({ src, alt, focalX, focalY, heightPreset, customMin, customVw, customMax }) {
+function generateHtml({ src, alt, focalX, focalY, heightPreset, customMin, customVw, customMax }: GenerateHtmlInput): string {
   const x = Math.round(focalX)
   const y = Math.round(focalY)
   const hp = resolveHeight(heightPreset, customMin, customVw, customMax)
@@ -76,7 +135,13 @@ function generateHtml({ src, alt, focalX, focalY, heightPreset, customMin, custo
 const STORAGE_KEY = 'heroHelper-dnn-folder'
 
 // ── Section label ────────────────────────────────────────────────────────────
-function SectionLabel({ number, title, done }) {
+interface SectionLabelProps {
+  number: number
+  title: string
+  done: boolean
+}
+
+function SectionLabel({ number, title, done }: SectionLabelProps) {
   return (
     <div className="flex items-center gap-2 mb-3">
       <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0
@@ -89,13 +154,13 @@ function SectionLabel({ number, title, done }) {
 }
 
 export default function App() {
-  const fileRef = useRef(null)
-  const pickerRef = useRef(null)
+  const fileRef = useRef<HTMLInputElement | null>(null)
+  const pickerRef = useRef<HTMLDivElement | null>(null)
 
-  const [state, setState] = useState({
+  const [state, setState] = useState<State>({
     mode: 'pc',
     previewUrl: '',
-    dnnFolder: localStorage.getItem(STORAGE_KEY) || '',
+    dnnFolder: localStorage.getItem(STORAGE_KEY) ?? '',
     dnnFile: '',
     urlInput: '',
     src: '',
@@ -126,15 +191,15 @@ export default function App() {
 
   const html = isComplete ? generateHtml({ src: srcForOutput, alt, focalX, focalY, heightPreset, customMin, customVw, customMax }) : ''
 
-  const currentPreset = PRESETS.find(p => p.key === simPreset) || PRESETS[2]
+  const currentPreset = PRESETS.find(p => p.key === simPreset) ?? PRESETS[2]
   const currentHeight = resolveHeight(heightPreset, customMin, customVw, customMax)
   const isMobile = simPreset === 'mobile'
-  const showSizeWarning = !isMobile && imgNatural.w > 0 && currentPreset.width > imgNatural.w
+  const showSizeWarning = !isMobile && imgNatural.w > 0 && currentPreset.width !== null && currentPreset.width > imgNatural.w
 
   // ── Crop overlay math ────────────────────────────────────────────────────────
   // Returns % coords (relative to picker display area) for the dashed crop rectangle.
-  function getCropOverlay() {
-    if (isMobile || !imgNatural.w || !imgNatural.h || !pickerRef.current) return null
+  function getCropOverlay(): CropOverlay | null {
+    if (isMobile || !imgNatural.w || !imgNatural.h || !pickerRef.current || currentPreset.width === null) return null
     const simWidth = currentPreset.width
     const pickerW = pickerRef.current.offsetWidth
     const pickerH = pickerRef.current.offsetHeight
@@ -165,41 +230,44 @@ export default function App() {
     }
   }
 
+  // Reads pickerRef.current.offsetWidth/Height at render time. Re-runs whenever
+  // state changes (e.g. focal point click, image load) so values stay current.
+  // eslint-disable-next-line react-hooks/refs
   const cropOverlay = previewUrl ? getCropOverlay() : null
 
   // ── Handlers ────────────────────────────────────────────────────────────────
-  const handleFileChange = (e) => {
-    const file = e.target.files[0]
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
     if (!file) return
     const objectUrl = URL.createObjectURL(file)
     setState(s => ({ ...s, previewUrl: objectUrl, dnnFile: file.name, imgNatural: { w: 0, h: 0 } }))
   }
 
-  const handleDnnFolder = (val) => {
+  const handleDnnFolder = (val: string) => {
     const clean = val.replace(/[^a-zA-Z0-9/_\-. ]/g, '')
     localStorage.setItem(STORAGE_KEY, clean)
     setState(s => ({ ...s, dnnFolder: clean }))
   }
 
-  const handleModeChange = (newMode) => {
+  const handleModeChange = (newMode: Mode) => {
     setState(s => ({ ...s, mode: newMode, previewUrl: '', urlInput: '', dnnFile: '', imgNatural: { w: 0, h: 0 } }))
     if (fileRef.current) fileRef.current.value = ''
   }
 
-  const handleUrlInput = (val) => {
+  const handleUrlInput = (val: string) => {
     const safePreview = /^(https?:\/\/|\/)/i.test(val.trim()) ? val : ''
     setState(s => ({ ...s, urlInput: val, previewUrl: safePreview, imgNatural: { w: 0, h: 0 } }))
   }
 
-  const handleFocalClick = useCallback((e) => {
+  const handleFocalClick = useCallback((e: MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
     const x = ((e.clientX - rect.left) / rect.width) * 100
     const y = ((e.clientY - rect.top) / rect.height) * 100
     setState(s => ({ ...s, focalX: Math.round(x), focalY: Math.round(y) }))
   }, [])
 
-  const handleNaturalLoad = useCallback((e) => {
-    const { naturalWidth: w, naturalHeight: h } = e.target
+  const handleNaturalLoad = useCallback((e: SyntheticEvent<HTMLImageElement>) => {
+    const { naturalWidth: w, naturalHeight: h } = e.currentTarget
     if (w && h) setState(s => ({ ...s, imgNatural: { w, h } }))
   }, [])
 
@@ -214,7 +282,7 @@ export default function App() {
     setState({
       mode: 'pc',
       previewUrl: '',
-      dnnFolder: localStorage.getItem(STORAGE_KEY) || '',
+      dnnFolder: localStorage.getItem(STORAGE_KEY) ?? '',
       dnnFile: '',
       urlInput: '',
       src: '',
@@ -231,6 +299,13 @@ export default function App() {
     setAltWarned(false)
     if (fileRef.current) fileRef.current.value = ''
   }
+
+  // Custom-height field config (typed key prevents typos in setState spread)
+  const customFields: { label: string; key: CustomKey; value: number; min: number; max: number }[] = [
+    { label: 'Min (px)', key: 'customMin', value: customMin, min: 50, max: customMax - 1 },
+    { label: 'Preferred (vw)', key: 'customVw', value: customVw, min: 1, max: 100 },
+    { label: 'Max (px)', key: 'customMax', value: customMax, min: customMin + 1, max: 2000 },
+  ]
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
@@ -257,10 +332,10 @@ export default function App() {
 
               {/* Mode toggle */}
               <div className="flex gap-2 mb-4">
-                {[
+                {([
                   { id: 'pc', label: 'Image on this PC' },
                   { id: 'url', label: 'Image at a URL' },
-                ].map(({ id, label }) => (
+                ] as { id: Mode; label: string }[]).map(({ id, label }) => (
                   <button
                     key={id}
                     onClick={() => handleModeChange(id)}
@@ -456,11 +531,7 @@ export default function App() {
                 {/* Custom clamp inputs */}
                 {heightPreset === 'custom' && (
                   <div className="mt-2 grid grid-cols-3 gap-2">
-                    {[
-                      { label: 'Min (px)', key: 'customMin', value: customMin, min: 50, max: customMax - 1 },
-                      { label: 'Preferred (vw)', key: 'customVw', value: customVw, min: 1, max: 100 },
-                      { label: 'Max (px)', key: 'customMax', value: customMax, min: customMin + 1, max: 2000 },
-                    ].map(({ label, key, value, min, max }) => (
+                    {customFields.map(({ label, key, value, min, max }) => (
                       <div key={key}>
                         <label className="block text-[10px] text-gray-500 mb-0.5">{label}</label>
                         <input
@@ -534,7 +605,7 @@ export default function App() {
                     />
                     <p className="text-center text-xs text-gray-400 py-1.5">Mobile — image is not cropped</p>
                   </div>
-                ) : (
+                ) : currentPreset.width !== null ? (
                   <div
                     className="w-full overflow-hidden"
                     style={{ aspectRatio: `${currentPreset.width} / ${currentHeight.calcH(currentPreset.width)}` }}
@@ -547,7 +618,7 @@ export default function App() {
                       onLoad={handleNaturalLoad}
                     />
                   </div>
-                )}
+                ) : null}
 
                 {showSizeWarning && (
                   <div className="px-3 py-1.5 bg-amber-50 border-t border-amber-200 text-xs text-amber-700 flex items-center gap-1.5">
