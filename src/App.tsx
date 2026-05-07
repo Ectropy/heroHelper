@@ -324,7 +324,7 @@ export default function App() {
                     onClick={handleFocalClick}
                   >
                     <img
-                      src={previewUrl}
+                      src={previewUrl /* codeql[js/xss-through-dom]: previewUrl is either a blob: URL from URL.createObjectURL (PC mode, scheme controlled by browser) or a value that has passed safeImageUrl's http(s)/root-relative filter (URL mode). <img src> does not execute javascript: URIs. */}
                       alt="Click to set focal point"
                       className="w-full object-cover block pointer-events-none"
                       style={{ maxHeight: '300px' }}
@@ -474,7 +474,7 @@ export default function App() {
                 {isMobile ? (
                   <div className="w-full bg-gray-50">
                     <img
-                      src={previewUrl}
+                      src={previewUrl /* codeql[js/xss-through-dom]: see focal-point picker img above — same sanitization invariants apply. */}
                       alt="Mobile preview"
                       className="w-full block"
                       style={{ objectFit: 'contain', height: 'auto' }}
@@ -487,7 +487,7 @@ export default function App() {
                     style={{ aspectRatio: `${currentPreset.width} / ${currentHeight.calcH(currentPreset.width)}` }}
                   >
                     <img
-                      src={previewUrl}
+                      src={previewUrl /* codeql[js/xss-through-dom]: see focal-point picker img above — same sanitization invariants apply. */}
                       alt="Crop preview"
                       className="w-full h-full object-cover block"
                       style={{ objectPosition: `${focalX}% ${focalY}%` }}
