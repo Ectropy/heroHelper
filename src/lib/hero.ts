@@ -84,7 +84,12 @@ export function resolveHeight(heightPreset: HeightPresetKey, customMin: number, 
 export function safeImageUrl(input: string): string {
   const trimmed = input.trim()
   if (!trimmed) return ''
-  if (trimmed.startsWith('/') && !trimmed.startsWith('//')) return trimmed
+  if (trimmed.startsWith('/') && !trimmed.startsWith('//')) {
+    try {
+      const u = new URL(trimmed, 'https://localhost')
+      return u.pathname + u.search + u.hash
+    } catch { return '' }
+  }
   try {
     const u = new URL(trimmed)
     if (u.protocol === 'http:' || u.protocol === 'https:') return u.href
