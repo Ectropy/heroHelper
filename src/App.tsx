@@ -117,7 +117,7 @@ export default function App() {
     const file = e.target.files?.[0]
     if (!file) return
     const objectUrl = URL.createObjectURL(file)
-    setState(s => ({ ...s, previewUrl: objectUrl, dnnFile: file.name, imgNatural: { w: 0, h: 0 } }))
+    setState(s => ({ ...s, previewUrl: safeImageUrl(objectUrl), dnnFile: file.name, imgNatural: { w: 0, h: 0 } }))
   }
 
   const handleDnnFolder = (val: string) => {

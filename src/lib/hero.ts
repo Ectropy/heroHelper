@@ -94,7 +94,7 @@ export function safeImageUrl(input: string): string {
   }
   try {
     const u = new URL(trimmed)
-    if (u.protocol === 'http:' || u.protocol === 'https:') return u.href
+    if (u.protocol === 'http:' || u.protocol === 'https:' || u.protocol === 'blob:') return u.href
   } catch { /* not a parseable URL */ }
   return ''
 }
