@@ -87,7 +87,7 @@ export function safeImageUrl(input: string): string {
   if (trimmed.startsWith('/') && !trimmed.startsWith('//')) return trimmed
   try {
     const u = new URL(trimmed)
-    if (u.protocol === 'http:' || u.protocol === 'https:') return trimmed
+    if (u.protocol === 'http:' || u.protocol === 'https:') return u.href
   } catch { /* not a parseable URL */ }
   return ''
 }
