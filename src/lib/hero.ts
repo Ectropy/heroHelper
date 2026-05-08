@@ -86,9 +86,11 @@ export function safeImageUrl(input: string): string {
   if (!trimmed) return ''
   if (trimmed.startsWith('/') && !trimmed.startsWith('//')) {
     try {
-      const u = new URL(trimmed, 'https://localhost')
-      return u.pathname + u.search + u.hash
-    } catch { return '' }
+      const FAKE_BASE = 'https://h.invalid'
+      const u = new URL(trimmed, FAKE_BASE)
+      if (u.origin === FAKE_BASE) return u.href.slice(FAKE_BASE.length)
+    } catch { /* fall through */ }
+    return ''
   }
   try {
     const u = new URL(trimmed)
