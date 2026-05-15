@@ -1,16 +1,16 @@
 import { HeroImageTool } from './components/HeroImageTool'
 import { HeroVideoTool } from './components/HeroVideoTool'
 import { useHashRoute, type Route } from './lib/useHashRoute'
-import { REPO_URL } from './lib/config'
+import { REPO_URL, SIDENAV_URL } from './lib/config'
 
-interface NavItem {
-  id: Route
-  label: string
-}
+type NavItem =
+  | { kind: 'route'; id: Route; label: string }
+  | { kind: 'external'; id: string; label: string; href: string }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: 'image', label: 'Hero Image' },
-  { id: 'video', label: 'Hero Video' },
+  { kind: 'route', id: 'image', label: 'Hero Image' },
+  { kind: 'route', id: 'video', label: 'Hero Video' },
+  { kind: 'external', id: 'sidenav', label: 'SideNav', href: SIDENAV_URL },
 ]
 
 export default function App() {
@@ -25,7 +25,9 @@ export default function App() {
           {NAV_ITEMS.map((item, i) => (
             <span key={item.id}>
               {i > 0 && <span className="mx-2 text-gray-300">|</span>}
-              {route === item.id ? (
+              {item.kind === 'external' ? (
+                <a href={item.href} className="text-gray-500 hover:text-blue-600 hover:underline">{item.label}</a>
+              ) : route === item.id ? (
                 <span className="font-semibold text-blue-600" aria-current="page">{item.label}</span>
               ) : (
                 <a href={`#/${item.id}`} className="text-gray-500 hover:text-blue-600 hover:underline">{item.label}</a>
