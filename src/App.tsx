@@ -1,7 +1,7 @@
 import { HeroImageTool } from './components/HeroImageTool'
 import { HeroVideoTool } from './components/HeroVideoTool'
 import { useHashRoute, type Route } from './lib/useHashRoute'
-import { REPO_URL, SIDENAV_URL } from './lib/config'
+import { REPO_URL, SIDENAV_URL, COMPONENT_DRAWER_URL, COMPONENT_CARDS_URL } from './lib/config'
 
 type NavItem =
   | { kind: 'route'; id: Route; label: string }
@@ -10,7 +10,9 @@ type NavItem =
 const NAV_ITEMS: NavItem[] = [
   { kind: 'route', id: 'image', label: 'Hero Image' },
   { kind: 'route', id: 'video', label: 'Hero Video' },
-  { kind: 'external', id: 'sidenav', label: 'SideNav', href: SIDENAV_URL },
+  { kind: 'external', id: 'sidenav', label: 'Sidenav', href: SIDENAV_URL },
+  { kind: 'external', id: 'drawer', label: 'Drawer', href: COMPONENT_DRAWER_URL },
+  { kind: 'external', id: 'cards', label: 'Cards', href: COMPONENT_CARDS_URL },
 ]
 
 export default function App() {
@@ -38,7 +40,7 @@ export default function App() {
 
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Hero Helper</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{route === 'video' ? 'Hero Video Helper' : 'Hero Image Helper'}</h1>
           <p className="mt-0.5 text-sm text-gray-500">
             {route === 'video'
               ? 'Easily generate hero video HTML for a DVIDS video.'
